@@ -8,8 +8,11 @@ import StringIO
 import PyRSS2Gen
 import urllib
 import datetime
+import hashlib
 #from google.appengine.ext import ndb
 from google.appengine.api import memcache
+
+HTTP_DATE_FMT = '%a, %d %b %Y %H:%M:%S %Z'
 
 
 #not use yet
@@ -24,24 +27,41 @@ class MainPage(webapp2.RequestHandler):
 #generate hinet rss
 class Hinet(webapp2.RequestHandler):
 
+    def output_content(self, content, serve=True):
+        if serve:
+            self.response.out.write(content)
+        else:
+            self.response.set_status(304)
+
     def set_headers(self):
         self.response.headers['Content-Type'] = 'application/xhtml+xml'
-        self.response.headers['Expires'] = '-1'
         self.response.headers['Cache-Control'] = 'public, max-age=3600, must-revalidate'
 
     def get_cache_data(self, rss):
         output = memcache.get(rss)
         mtime = memcache.get('h_mtime')
-        return output, mtime
+        etag = memcache.get('h_etag')
+        if mtime is None:
+            mtime = datetime.datetime.utcnow().strftime(HTTP_DATE_FMT) + 'GMT'
+        self.response.headers['Last-Modified'] = mtime
+        return output, mtime, etag
 
     def get(self):
-        output, mtime = self.get_cache_data('hinet_rss')
-        if mtime is None:
-            mtime = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-        self.response.headers['Last-Modified'] = mtime
+        serve = True
+        output, mtime, etag = self.get_cache_data('hinet_rss')
+        if 'If-Modified-Since' in self.request.headers:
+            last_seen = datetime.datetime.strptime(self.request.headers['If-Modified-Since'], HTTP_DATE_FMT)
+            last_modified = datetime.datetime.strptime(mtime, HTTP_DATE_FMT)
+            if last_seen >= last_modified:
+                serve = False
+        if 'If-None-Match' in self.request.headers:
+            etags = [x.strip('" ') for x in self.request.headers['If-None-Match'].split(',')]
+            if etag in etags:
+                serve = False
         if output is not None:
             self.set_headers()
-            self.response.write(output)
+            self.response.headers['ETag'] = '"%s"' % etag
+            self.output_content(output, serve)
             return
         items = []
         parser = hinet.MyHTMLParser()
@@ -60,34 +80,55 @@ class Hinet(webapp2.RequestHandler):
         output = StringIO.StringIO()
         rss.write_xml(output,encoding='utf-8')
 
+        etag = hashlib.sha1(output.getvalue()).hexdigest()
+
         memcache.set('hinet_rss', output.getvalue(), time=3600)
         memcache.set('h_mtime', mtime, time=3600)
+        memcache.set('h_etag', etag, time=3600)
 
         self.set_headers()
-        self.response.write(output.getvalue())
+        self.response.headers['ETag'] = '"%s"' % (etag,)
+        self.output_content(output.getvalue(), serve)
 
 
 #generate seednet rss
 class Seednet(webapp2.RequestHandler):
 
+    def output_content(self, content, serve=True):
+        if serve:
+            self.response.out.write(content)
+        else:
+            self.response.set_status(304)
+
     def set_headers(self):
         self.response.headers['Content-Type'] = 'application/xhtml+xml'
-        self.response.headers['Expires'] = '-1'
         self.response.headers['Cache-Control'] = 'public, max-age=3600, must-revalidate'
 
     def get_cache_data(self, rss):
         output = memcache.get('seednet_rss')
         mtime = memcache.get('s_mtime')
-        return output, mtime
+        etag = memcache.get('s_etag')
+        if mtime is None:
+            mtime = datetime.datetime.utcnow().strftime(HTTP_DATE_FMT) + 'GMT'
+        self.response.headers['Last-Modified'] = mtime
+        return output, mtime, etag
 
     def get(self):
-        output, mtime = self.get_cache_data('seednet_rss')
-        if mtime is None:
-            mtime = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-        self.response.headers['Last-Modified'] = mtime
+        serve = True
+        output, mtime, etag = self.get_cache_data('seednet_rss')
+        if 'If-Modified-Since' in self.request.headers:
+            last_seen = datetime.datetime.strptime(self.request.headers['If-Modified-Since'], HTTP_DATE_FMT)
+            last_modified = datetime.datetime.strptime(mtime, HTTP_DATE_FMT)
+            if last_seen >= last_modified:
+                serve = False
+        if 'If-None-Match' in self.request.headers:
+            etags = [x.strip('" ') for x in self.request.headers['If-None-Match'].split(',')]
+            if etag in etags:
+                serve = False
         if output is not None:
             self.set_headers()
-            self.response.write(output)
+            self.response.headers['ETag'] = '"%s"' % etag
+            self.output_content(output, serve)
             return
         items = []
         parser = seednet.MyHTMLParser()
@@ -107,11 +148,15 @@ class Seednet(webapp2.RequestHandler):
         output = StringIO.StringIO()
         rss.write_xml(output,encoding='utf-8')
 
+        etag = hashlib.sha1(output.getvalue()).hexdigest()
+
         memcache.set('seednet_rss', output.getvalue(), time=3600)
         memcache.set('s_mtime', mtime, time=3600)
+        memcache.set('s_etag', etag, time=3600)
 
         self.set_headers()
-        self.response.write(output.getvalue())
+        self.response.headers['ETag'] = '"%s"' % (etag,)
+        self.output_content(output.getvalue(), serve)
 
 
 application = webapp2.WSGIApplication([
