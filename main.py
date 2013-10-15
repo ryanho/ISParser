@@ -57,8 +57,8 @@ class Hinet(webapp2.RequestHandler):
         serve = True
         output, mtime, etag = self.get_cache_data('hinet_rss')
         if 'If-Modified-Since' in self.request.headers:
-            HTTP_DATE_FMT = check_date_fmt(self.request.headers['If-Modified-Since'])
-            last_seen = datetime.datetime.strptime(self.request.headers['If-Modified-Since'], HTTP_DATE_FMT)
+            IFMOD_DATE_FMT = check_date_fmt(self.request.headers['If-Modified-Since'])
+            last_seen = datetime.datetime.strptime(self.request.headers['If-Modified-Since'], IFMOD_DATE_FMT)
             last_modified = datetime.datetime.strptime(mtime, HTTP_DATE_FMT)
             if last_seen >= last_modified:
                 serve = False
@@ -125,8 +125,8 @@ class Seednet(webapp2.RequestHandler):
         serve = True
         output, mtime, etag = self.get_cache_data('seednet_rss')
         if 'If-Modified-Since' in self.request.headers:
-            HTTP_DATE_FMT = check_date_fmt(self.request.headers['If-Modified-Since'])
-            last_seen = datetime.datetime.strptime(self.request.headers['If-Modified-Since'], HTTP_DATE_FMT)
+            IFMOD_DATE_FMT = check_date_fmt(self.request.headers['If-Modified-Since'])
+            last_seen = datetime.datetime.strptime(self.request.headers['If-Modified-Since'], IFMOD_DATE_FMT)
             last_modified = datetime.datetime.strptime(mtime, HTTP_DATE_FMT)
             if last_seen >= last_modified:
                 serve = False
