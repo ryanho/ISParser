@@ -73,9 +73,9 @@ class Hinet(webapp2.RequestHandler):
             return
         items = []
         parser = hinet.MyHTMLParser()
-        parser.feed(urllib.urlopen('http://www.hinet.net/pu/notify.htm').read())
+        parser.feed(urllib.urlopen('http://search.hinet.net/getNotify?callback=jsonpCallback&type=0&sort=0&mobile=1').read())
         for i in parser.struc_data:
-            items.append(PyRSS2Gen.RSSItem(title=i[1] + ' ' + i[3], link=i[2], pubDate=i[0]))
+            items.append(PyRSS2Gen.RSSItem(title=i[1] + ' ' +i[3], link=i[2], pubDate=i[0]))
 
         rss = PyRSS2Gen.RSS2(
             title=u"Hinet系統公告",

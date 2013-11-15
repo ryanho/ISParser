@@ -6,12 +6,11 @@ import urllib
 import datetime
 
 #struc_data = [(announce_date, issue_date, p_title, p_url)]
-prefix_url = 'http://www.hinet.net/pu/'
 
 
 def roc2gmt(date):
-    year, month, day = date.split('/')
-    year = int(year) + 1911
+    year, month, day = date.split('-')
+    year = int(year)
     result = datetime.datetime.strptime(str(year) + month + day, '%Y%m%d').strftime('%a, %d %b %Y %H:%M:%S CST')
     return result
 
@@ -28,13 +27,13 @@ class MyHTMLParser(HTMLParser):
         HTMLParser.__init__(self)
 
     def handle_starttag(self, tag, attrs):
-        if tag == 'span' and attrs[0] == ('class', 'copyright news'):
+        if tag == 'li' and attrs[0] == ('class', 'p1'):
             self.marker = 1
-        elif tag == 'img' and attrs[0] == ('height', '10'):
+        elif tag == 'a':
             self.marker = 2
-        elif tag == 'a' and attrs[1] == ('class', 'head51 t'):
+            self.p_url = attrs[0][1]
+        elif tag == 'li' and attrs[0] == ('class', 'date'):
             self.marker = 3
-            self.p_url = prefix_url + attrs[0][1]
 
     def handle_endtag(self, tag):
         self.marker = 0
@@ -43,18 +42,19 @@ class MyHTMLParser(HTMLParser):
         if self.marker == 1:
             self.announce_date = roc2gmt(data.strip())
         elif self.marker == 2:
-            self.issue_date = data.strip()
-        elif self.marker == 3:
             self.p_title = data.decode('utf-8').strip()
+        elif self.marker == 3:
+            self.issue_date = data.strip()
             self.struc_data.append((self.announce_date, self.issue_date, self.p_url, self.p_title))
+
 
 if __name__ == '__main__':
     import PyRSS2Gen
     items = []
     parser = MyHTMLParser()
-    parser.feed(urllib.urlopen('http://www.hinet.net/pu/notify.htm').read())
+    parser.feed(urllib.urlopen('http://search.hinet.net/getNotify?callback=jsonpCallback&type=0&sort=0&mobile=1').read())
     for i in parser.struc_data:
-        items.append(PyRSS2Gen.RSSItem(title=i[1] + ' ' + i[3], link=i[2], pubDate=i[0]))
+        items.append(PyRSS2Gen.RSSItem(title=i[1] + ' ' +i[3], link=i[2], pubDate=i[0]))
 
     rss = PyRSS2Gen.RSS2(
         title=u"Hinet系統公告",
